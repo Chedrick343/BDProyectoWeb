@@ -12,3 +12,11 @@ CREATE TABLE persona (
     id_identificacion INT NOT NULL REFERENCES tipo_identificacion(id_identificacion),
     numero_telefono VARCHAR(20)
 );
+
+CREATE TABLE usuario (
+    id_usuario SERIAL PRIMARY KEY,
+    nombre_usuario VARCHAR(50) NOT NULL,
+    correo_electronico VARCHAR(150) NOT NULL,
+    contrasena VARCHAR(255) NOT NULL,
+    id_persona INT NOT NULL REFERENCES persona(id_persona)
+);
