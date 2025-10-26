@@ -57,3 +57,13 @@ CREATE TABLE tarjeta (
     id_persona INT NOT NULL REFERENCES persona(id_persona)
 );
 
+
+CREATE TABLE movimientos_tarjeta (
+    id SERIAL PRIMARY KEY,
+    id_tarjeta VARCHAR(30) NOT NULL REFERENCES tarjeta(numero_tarjeta),
+    fecha_movimiento TIMESTAMP NOT NULL,
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    descripcion VARCHAR(255),
+    moneda VARCHAR(10),
+    saldo_movimiento DECIMAL(15,2) NOT NULL
+);
