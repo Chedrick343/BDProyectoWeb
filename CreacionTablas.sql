@@ -29,3 +29,13 @@ CREATE TABLE cuenta (
     saldo_disponible DECIMAL(15,2) NOT NULL,
     id_persona INT NOT NULL REFERENCES persona(id_persona)
 );
+
+CREATE TABLE movimientos_cuenta (
+    id SERIAL PRIMARY KEY,
+    numero_cuenta VARCHAR(30) NOT NULL REFERENCES cuenta(numero_cuenta),
+    fecha_movimiento TIMESTAMP NOT NULL,
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    descripcion VARCHAR(255),
+    moneda VARCHAR(10),
+    saldo_movimiento DECIMAL(15,2) NOT NULL
+);
