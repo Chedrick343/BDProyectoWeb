@@ -39,3 +39,21 @@ CREATE TABLE movimientos_cuenta (
     moneda VARCHAR(10),
     saldo_movimiento DECIMAL(15,2) NOT NULL
 );
+
+CREATE TABLE tipo_tarjeta (
+    id_tipo SERIAL PRIMARY KEY,
+    nombre_tipo VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE tarjeta (
+    numero_tarjeta VARCHAR(30) PRIMARY KEY,
+    id_tipo INT NOT NULL REFERENCES tipo_tarjeta(id_tipo),
+    expiracion DATE NOT NULL,
+    pin VARCHAR(10) NOT NULL,
+    cvv VARCHAR(10) NOT NULL,
+    moneda VARCHAR(10) NOT NULL,
+    limite DECIMAL(15,2) NOT NULL,
+    saldo DECIMAL(15,2) NOT NULL,
+    id_persona INT NOT NULL REFERENCES persona(id_persona)
+);
+
