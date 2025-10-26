@@ -67,3 +67,14 @@ CREATE TABLE movimientos_tarjeta (
     moneda VARCHAR(10),
     saldo_movimiento DECIMAL(15,2) NOT NULL
 );
+
+
+CREATE TABLE transferencia (
+    id SERIAL PRIMARY KEY,
+    cuenta_origen VARCHAR(30) NOT NULL REFERENCES cuenta(numero_cuenta),
+    cuenta_destino VARCHAR(30) NOT NULL REFERENCES cuenta(numero_cuenta),
+    moneda VARCHAR(10) NOT NULL,
+    monto DECIMAL(15,2) NOT NULL,
+    descripcion VARCHAR(255),
+    fecha_transferencia TIMESTAMP NOT NULL
+);
