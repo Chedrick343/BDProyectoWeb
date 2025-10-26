@@ -20,3 +20,12 @@ CREATE TABLE usuario (
     contrasena VARCHAR(255) NOT NULL,
     id_persona INT NOT NULL REFERENCES persona(id_persona)
 );
+
+CREATE TABLE cuenta (
+    numero_cuenta VARCHAR(30) PRIMARY KEY,
+    alias VARCHAR(50),
+    tipo_cuenta VARCHAR(20) NOT NULL,
+    moneda VARCHAR(10) NOT NULL,
+    saldo_disponible DECIMAL(15,2) NOT NULL,
+    id_persona INT NOT NULL REFERENCES persona(id_persona)
+);
