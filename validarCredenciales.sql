@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION validar_credenciales(
+CREATE OR REPLACE FUNCTION sp_auth_user_get_by_username_or_email(
     p_login VARCHAR,        -- puede ser nombre de usuario o correo
     p_contrasena VARCHAR
 )

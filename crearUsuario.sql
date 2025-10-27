@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE crear_usuario(
+CREATE OR REPLACE PROCEDURE sp_users_create(
     p_nombre VARCHAR,
     p_primer_apellido VARCHAR,
     p_segundo_apellido VARCHAR,
@@ -56,4 +56,3 @@ BEGIN
     END;
 END;
 $$;
-
