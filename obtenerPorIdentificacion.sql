@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION sp_users_get_by_identification(
     p_numero_identificacion VARCHAR
+    
 )
 RETURNS TABLE (
     id_usuario INT,
