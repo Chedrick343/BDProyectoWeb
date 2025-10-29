@@ -21,8 +21,10 @@ CREATE TABLE usuario (
     nombre_usuario VARCHAR(50) NOT NULL,
     correo_electronico VARCHAR(150) NOT NULL,
     contrasena VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL,
     id_persona INT NOT NULL REFERENCES persona(id_persona)
 );
+
 
 CREATE TABLE cuenta (
     numero_cuenta VARCHAR(30) PRIMARY KEY,
