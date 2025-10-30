@@ -1,28 +1,21 @@
 CREATE OR REPLACE FUNCTION sp_users_get_by_identification(
-    p_numero_identificacion VARCHAR
-    
+    p_identificacion VARCHAR
 )
 RETURNS TABLE (
-    id_usuario INT,
-    nombre_usuario VARCHAR,
-    correo_electronico VARCHAR,
+    id UUID,
     nombre VARCHAR,
-    primer_apellido VARCHAR,
-    segundo_apellido VARCHAR
+    apellido VARCHAR,
+    correo VARCHAR,
+    usuario VARCHAR,
+    rol UUID
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
-        u.id_usuario,
-        u.nombre_usuario,
-        u.correo_electronico,
-        p.nombre,
-        p.primer_apellido,
-        p.segundo_apellido
+    SELECT u.id, u.nombre, u.apellido, u.correo, u.usuario, u.rol
     FROM usuario u
-    INNER JOIN persona p ON u.id_persona = p.id_persona
-    WHERE p.numero_identificacion = p_numero_identificacion;
+    WHERE u.identificacion = p_identificacion
+    LIMIT 1;
 END;
 $$;

@@ -1,85 +1,176 @@
--- Active: 1761282992477@@134.199.141.222@15431@fecr_damena
---CREACIÓN DE TABLAS JIMENA MENDEZ Y CHEDRICK UZAGA
---PARA TENER LAS TABLAS COMPLETAS DE LA BASE DE DATOS EJECUTAR ESTE SCRIPT
+
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+
+DROP TABLE IF EXISTS api_key CASCADE;
+DROP TABLE IF EXISTS otp CASCADE;
+DROP TABLE IF EXISTS transferencia CASCADE;
+DROP TABLE IF EXISTS movimiento_tarjeta CASCADE;
+DROP TABLE IF EXISTS tarjeta CASCADE;
+DROP TABLE IF EXISTS movimiento_cuenta CASCADE;
+DROP TABLE IF EXISTS cuenta CASCADE;
+DROP TABLE IF EXISTS usuario CASCADE;
+
+DROP TABLE IF EXISTS estado_cuenta CASCADE;
+DROP TABLE IF EXISTS moneda CASCADE;
+DROP TABLE IF EXISTS tipo_movimiento_tarjeta CASCADE;
+DROP TABLE IF EXISTS tipo_movimiento_cuenta CASCADE;
+DROP TABLE IF EXISTS tipo_tarjeta CASCADE;
+DROP TABLE IF EXISTS tipo_cuenta CASCADE;
+DROP TABLE IF EXISTS tipo_identificacion CASCADE;
+DROP TABLE IF EXISTS rol CASCADE;
+
+-- ===========================================
+-- TABLAS BÁSICAS DE CONFIGURACIÓN
+-- ===========================================
+
+CREATE TABLE rol (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
+);
+
 CREATE TABLE tipo_identificacion (
-    id_identificacion SERIAL PRIMARY KEY,
-    nombre_identificacion VARCHAR(50) NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
 );
 
-CREATE TABLE persona (
-    id_persona SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    primer_apellido VARCHAR(100) NOT NULL,
-    segundo_apellido VARCHAR(100),
-    numero_identificacion VARCHAR(50) NOT NULL UNIQUE,
-    id_identificacion INT NOT NULL REFERENCES tipo_identificacion(id_identificacion),
-    numero_telefono VARCHAR(20)
-);
-
-CREATE TABLE usuario (
-    id_usuario SERIAL PRIMARY KEY,
-    nombre_usuario VARCHAR(50) NOT NULL,
-    correo_electronico VARCHAR(150) NOT NULL,
-    contrasena VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL,
-    id_persona INT NOT NULL REFERENCES persona(id_persona)
-);
-
-
-CREATE TABLE cuenta (
-    numero_cuenta VARCHAR(30) PRIMARY KEY,
-    alias VARCHAR(50),
-    tipo_cuenta VARCHAR(20) NOT NULL,
-    moneda VARCHAR(10) NOT NULL,
-    saldo_disponible DECIMAL(15,2) NOT NULL,
-    id_persona INT NOT NULL REFERENCES persona(id_persona)
-);
-
-CREATE TABLE movimientos_cuenta (
-    id SERIAL PRIMARY KEY,
-    numero_cuenta VARCHAR(30) NOT NULL REFERENCES cuenta(numero_cuenta),
-    fecha_movimiento TIMESTAMP NOT NULL,
-    tipo_movimiento VARCHAR(20) NOT NULL,
-    descripcion VARCHAR(255),
-    moneda VARCHAR(10),
-    saldo_movimiento DECIMAL(15,2) NOT NULL
+CREATE TABLE tipo_cuenta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
 );
 
 CREATE TABLE tipo_tarjeta (
-    id_tipo SERIAL PRIMARY KEY,
-    nombre_tipo VARCHAR(50) NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
 );
+
+CREATE TABLE tipo_movimiento_cuenta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
+);
+
+CREATE TABLE tipo_movimiento_tarjeta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
+);
+
+CREATE TABLE moneda (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    iso VARCHAR(10) NOT NULL
+);
+
+CREATE TABLE estado_cuenta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
+);
+
+-- ===========================================
+-- TABLA USUARIO
+-- ===========================================
+
+CREATE TABLE usuario (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tipo_identificacion UUID NOT NULL REFERENCES tipo_identificacion(id),
+    identificacion VARCHAR(50) NOT NULL UNIQUE,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    correo VARCHAR(150) NOT NULL UNIQUE,
+    telefono VARCHAR(20),
+    usuario VARCHAR(50) NOT NULL UNIQUE,
+    contrasena_hash VARCHAR(255) NOT NULL,
+    rol UUID NOT NULL REFERENCES rol(id),
+    fecha_creacion TIMESTAMP DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMP DEFAULT NOW()
+);
+
+
+
+CREATE TABLE cuenta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID NOT NULL REFERENCES usuario(id),
+    iban VARCHAR(34) NOT NULL UNIQUE,
+    alias VARCHAR(50),
+    tipo_cuenta UUID NOT NULL REFERENCES tipo_cuenta(id),
+    moneda UUID NOT NULL REFERENCES moneda(id),
+    saldo DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    estado UUID NOT NULL REFERENCES estado_cuenta(id),
+    fecha_creacion TIMESTAMP DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE movimiento_cuenta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cuenta_id UUID NOT NULL REFERENCES cuenta(id),
+    fecha TIMESTAMP DEFAULT NOW(),
+    tipo UUID NOT NULL REFERENCES tipo_movimiento_cuenta(id),
+    descripcion TEXT,
+    moneda UUID NOT NULL REFERENCES moneda(id),
+    monto DECIMAL(18,2) NOT NULL
+);
+
 
 CREATE TABLE tarjeta (
-    numero_tarjeta VARCHAR(30) PRIMARY KEY,
-    id_tipo INT NOT NULL REFERENCES tipo_tarjeta(id_tipo),
-    expiracion DATE NOT NULL,
-    pin VARCHAR(10) NOT NULL,
-    cvv VARCHAR(10) NOT NULL,
-    moneda VARCHAR(10) NOT NULL,
-    limite DECIMAL(15,2) NOT NULL,
-    saldo DECIMAL(15,2) NOT NULL,
-    id_persona INT NOT NULL REFERENCES persona(id_persona)
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID NOT NULL REFERENCES usuario(id),
+    tipo UUID NOT NULL REFERENCES tipo_tarjeta(id),
+    numero_enmascarado VARCHAR(25) NOT NULL,
+    fecha_expiracion VARCHAR(5) NOT NULL,  -- formato MM/YY
+    cvv_hash VARCHAR(255) NOT NULL,
+    pin_hash VARCHAR(255) NOT NULL,
+    moneda UUID NOT NULL REFERENCES moneda(id),
+    limite_credito DECIMAL(18,2) NOT NULL,
+    saldo_actual DECIMAL(18,2) NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMP DEFAULT NOW()
 );
 
-
-CREATE TABLE movimientos_tarjeta (
-    id SERIAL PRIMARY KEY,
-    id_tarjeta VARCHAR(30) NOT NULL REFERENCES tarjeta(numero_tarjeta),
-    fecha_movimiento TIMESTAMP NOT NULL,
-    tipo_movimiento VARCHAR(20) NOT NULL,
-    descripcion VARCHAR(255),
-    moneda VARCHAR(10),
-    saldo_movimiento DECIMAL(15,2) NOT NULL
+CREATE TABLE movimiento_tarjeta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tarjeta_id UUID NOT NULL REFERENCES tarjeta(id),
+    fecha TIMESTAMP DEFAULT NOW(),
+    tipo UUID NOT NULL REFERENCES tipo_movimiento_tarjeta(id),
+    descripcion TEXT,
+    moneda UUID NOT NULL REFERENCES moneda(id),
+    monto DECIMAL(18,2) NOT NULL
 );
+
 
 
 CREATE TABLE transferencia (
-    id SERIAL PRIMARY KEY,
-    cuenta_origen VARCHAR(30) NOT NULL REFERENCES cuenta(numero_cuenta),
-    cuenta_destino VARCHAR(30) NOT NULL REFERENCES cuenta(numero_cuenta),
-    moneda VARCHAR(10) NOT NULL,
-    monto DECIMAL(15,2) NOT NULL,
-    descripcion VARCHAR(255),
-    fecha_transferencia TIMESTAMP NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cuenta_origen UUID NOT NULL REFERENCES cuenta(id),
+    cuenta_destino UUID NOT NULL REFERENCES cuenta(id),
+    moneda UUID NOT NULL REFERENCES moneda(id),
+    monto DECIMAL(18,2) NOT NULL,
+    descripcion TEXT,
+    fecha_transferencia TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE otp (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID NOT NULL REFERENCES usuario(id),
+    codigo_hash VARCHAR(255) NOT NULL,
+    proposito VARCHAR(50) NOT NULL CHECK (proposito IN ('password_reset', 'card_details')),
+    fecha_expiracion TIMESTAMP NOT NULL,
+    fecha_consumido TIMESTAMP NULL,
+    fecha_creacion TIMESTAMP DEFAULT NOW()
+);
+
+
+
+CREATE TABLE api_key (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    clave_hash VARCHAR(255) NOT NULL,
+    etiqueta VARCHAR(100),
+    activa BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMP DEFAULT NOW()
 );
