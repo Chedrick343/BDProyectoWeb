@@ -1,49 +1,30 @@
 CREATE OR REPLACE FUNCTION sp_cards_get(
-    p_owner_id INT DEFAULT NULL,
-    p_card_id VARCHAR(30) DEFAULT NULL
+    p_owner_id UUID DEFAULT NULL,
+    p_card_id UUID DEFAULT NULL
 )
 RETURNS TABLE(
-    numero_tarjeta VARCHAR(30),
-    id_tipo INT,
-    expiracion DATE,
-    moneda VARCHAR(10),
-    limite DECIMAL(15,2),
-    saldo DECIMAL(15,2),
-    id_persona INT,
-    nombre_tipo VARCHAR(50)
-)
-LANGUAGE plpgsql
-AS $$
+    cards JSON
+) AS $$
 BEGIN
-    IF p_card_id IS NOT NULL THEN
-        RETURN QUERY
-        SELECT 
-            t.numero_tarjeta,
-            t.id_tipo,
-            t.expiracion,
-            t.moneda,
-            t.limite,
-            t.saldo,
-            t.id_persona,
-            tt.nombre_tipo
-        FROM tarjeta t
-        INNER JOIN tipo_tarjeta tt ON t.id_tipo = tt.id_tipo
-        WHERE t.numero_tarjeta = p_card_id
-        AND (p_owner_id IS NULL OR t.id_persona = p_owner_id);
-    ELSE
-        RETURN QUERY
-        SELECT 
-            t.numero_tarjeta,
-            t.id_tipo,
-            t.expiracion,
-            t.moneda,
-            t.limite,
-            t.saldo,
-            t.id_persona,
-            tt.nombre_tipo
-        FROM tarjeta t
-        INNER JOIN tipo_tarjeta tt ON t.id_tipo = tt.id_tipo
-        WHERE p_owner_id IS NULL OR t.id_persona = p_owner_id;
-    END IF;
+    RETURN QUERY
+    SELECT 
+        json_agg(
+            json_build_object(
+                'id', t.id,
+                'usuario_id', t.usuario_id,
+                'tipo', tt.nombre,
+                'numero_enmascarado', t.numero_enmascarado,
+                'fecha_expiracion', t.fecha_expiracion,
+                'moneda', m.iso,
+                'limite_credito', t.limite_credito,
+                'saldo_actual', t.saldo_actual,
+                'fecha_creacion', t.fecha_creacion
+            )
+        ) AS cards
+    FROM tarjeta t
+    INNER JOIN tipo_tarjeta tt ON t.tipo = tt.id
+    INNER JOIN moneda m ON t.moneda = m.id
+    WHERE (p_owner_id IS NULL OR t.usuario_id = p_owner_id)
+    AND (p_card_id IS NULL OR t.id = p_card_id);
 END;
-$$;
+$$ LANGUAGE plpgsql;
