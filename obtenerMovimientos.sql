@@ -1,43 +1,61 @@
 CREATE OR REPLACE FUNCTION sp_card_movements_list(
-    p_card_id VARCHAR(30),
+    p_card_id UUID,
     p_from_date TIMESTAMP DEFAULT NULL,
     p_to_date TIMESTAMP DEFAULT NULL,
-    p_type VARCHAR(20) DEFAULT NULL,
-    p_search VARCHAR(255) DEFAULT NULL,
-    p_page INT DEFAULT 1,
-    p_page_size INT DEFAULT 10
+    p_type UUID DEFAULT NULL,
+    p_q TEXT DEFAULT NULL,
+    p_page INTEGER DEFAULT 1,
+    p_page_size INTEGER DEFAULT 10
 )
 RETURNS TABLE(
-    id INT,
-    id_tarjeta VARCHAR(30),
-    fecha_movimiento TIMESTAMP,
-    tipo_movimiento VARCHAR(20),
-    descripcion VARCHAR(255),
-    moneda VARCHAR(10),
-    saldo_movimiento DECIMAL(15,2),
-    total_count BIGINT
-)
-LANGUAGE plpgsql
-AS $$
+    items JSON,
+    total BIGINT,
+    page INTEGER,
+    page_size INTEGER
+) AS $$
+DECLARE
+    v_total BIGINT;
+    v_offset INTEGER;
 BEGIN
+    -- Calcular offset para paginación
+    v_offset := (p_page - 1) * p_page_size;
+    
+    -- Obtener el total de registros
+    SELECT COUNT(*) INTO v_total
+    FROM movimiento_tarjeta mt
+    WHERE mt.tarjeta_id = p_card_id
+    AND (p_from_date IS NULL OR mt.fecha >= p_from_date)
+    AND (p_to_date IS NULL OR mt.fecha <= p_to_date)
+    AND (p_type IS NULL OR mt.tipo = p_type)
+    AND (p_q IS NULL OR mt.descripcion ILIKE '%' || p_q || '%');
+    
+    -- Retornar los resultados paginados
     RETURN QUERY
     SELECT 
-        mt.id,
-        mt.id_tarjeta,
-        mt.fecha_movimiento,
-        mt.tipo_movimiento,
-        mt.descripcion,
-        mt.moneda,
-        mt.saldo_movimiento,
-        COUNT(*) OVER() as total_count
-    FROM movimientos_tarjeta mt
-    WHERE mt.id_tarjeta = p_card_id
-    AND (p_from_date IS NULL OR mt.fecha_movimiento >= p_from_date)
-    AND (p_to_date IS NULL OR mt.fecha_movimiento <= p_to_date)
-    AND (p_type IS NULL OR mt.tipo_movimiento = p_type)
-    AND (p_search IS NULL OR mt.descripcion ILIKE '%' || p_search || '%')
-    ORDER BY mt.fecha_movimiento DESC
+        json_agg(
+            json_build_object(
+                'id', mt.id,
+                'fecha', mt.fecha,
+                'tipo', tmt.nombre,
+                'descripcion', mt.descripcion,
+                'moneda', m.iso,
+                'monto', mt.monto
+            )
+        ) AS items,
+        v_total AS total,
+        p_page AS page,
+        p_page_size AS page_size
+    FROM movimiento_tarjeta mt
+    INNER JOIN tipo_movimiento_tarjeta tmt ON mt.tipo = tmt.id
+    INNER JOIN moneda m ON mt.moneda = m.id
+    WHERE mt.tarjeta_id = p_card_id
+    AND (p_from_date IS NULL OR mt.fecha >= p_from_date)
+    AND (p_to_date IS NULL OR mt.fecha <= p_to_date)
+    AND (p_type IS NULL OR mt.tipo = p_type)
+    AND (p_q IS NULL OR mt.descripcion ILIKE '%' || p_q || '%')
+    ORDER BY mt.fecha DESC
     LIMIT p_page_size
-    OFFSET (p_page - 1) * p_page_size;
+    OFFSET v_offset;
+    
 END;
-$$;
+$$ LANGUAGE plpgsql;
