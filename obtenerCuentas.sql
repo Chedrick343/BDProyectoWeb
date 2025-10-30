@@ -1,53 +1,43 @@
-CREATE OR REPLACE FUNCTION fn_accounts_get(
-    p_id_usuario_solicitante INT,
-    p_id_usuario_objetivo INT
+CREATE OR REPLACE FUNCTION sp_accounts_get(
+    p_owner_id UUID DEFAULT NULL,
+    p_account_id UUID DEFAULT NULL
 )
 RETURNS TABLE (
-    numero_cuenta VARCHAR(30),
-    alias VARCHAR(50),
-    tipo_cuenta VARCHAR(20),
-    moneda VARCHAR(10),
-    saldo_disponible DECIMAL(15,2)
+    id UUID,
+    iban VARCHAR,
+    alias VARCHAR,
+    tipo_cuenta VARCHAR,
+    moneda_iso VARCHAR,
+    saldo DECIMAL(18,2),
+    estado VARCHAR,
+    fecha_creacion TIMESTAMP
 )
 LANGUAGE plpgsql
 AS $$
-DECLARE
-    v_role_solicitante VARCHAR;
-    v_id_persona_objetivo INT;
 BEGIN
+    IF p_account_id IS NOT NULL THEN
+        RETURN QUERY
+        SELECT c.id, c.iban, c.alias, tc.nombre, m.iso, c.saldo, ec.nombre, c.fecha_creacion
+        FROM cuenta c
+        JOIN tipo_cuenta tc ON c.tipo_cuenta = tc.id
+        JOIN moneda m ON c.moneda = m.id
+        JOIN estado_cuenta ec ON c.estado = ec.id
+        WHERE c.id = p_account_id;
+        RETURN;
+    END IF;
 
-    SELECT role INTO v_role_solicitante
-    FROM usuario
-    WHERE id_usuario = p_id_usuario_solicitante;
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'El usuario solicitante con id % no existe.', p_id_usuario_solicitante;
+    IF p_owner_id IS NOT NULL THEN
+        RETURN QUERY
+        SELECT c.id, c.iban, c.alias, tc.nombre, m.iso, c.saldo, ec.nombre, c.fecha_creacion
+        FROM cuenta c
+        JOIN tipo_cuenta tc ON c.tipo_cuenta = tc.id
+        JOIN moneda m ON c.moneda = m.id
+        JOIN estado_cuenta ec ON c.estado = ec.id
+        WHERE c.usuario_id = p_owner_id;
+        RETURN;
     END IF;
 
 
-    SELECT id_persona INTO v_id_persona_objetivo
-    FROM usuario
-    WHERE id_usuario = p_id_usuario_objetivo;
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'El usuario objetivo con id % no existe.', p_id_usuario_objetivo;
-    END IF;
-
-
-    IF v_role_solicitante <> 'admin' AND p_id_usuario_solicitante <> p_id_usuario_objetivo THEN
-        RAISE EXCEPTION 'Acceso denegado: el usuario % no tiene permisos para ver las cuentas de %.',
-                        p_id_usuario_solicitante, p_id_usuario_objetivo;
-    END IF;
-
-
-    RETURN QUERY
-    SELECT
-        numero_cuenta,
-        alias,
-        tipo_cuenta,
-        moneda,
-        saldo_disponible
-    FROM cuenta
-    WHERE id_persona = v_id_persona_objetivo;
+    RAISE EXCEPTION 'Debe proporcionar owner_id o account_id';
 END;
 $$;

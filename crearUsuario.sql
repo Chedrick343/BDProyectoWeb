@@ -1,58 +1,55 @@
-CREATE OR REPLACE PROCEDURE sp_users_create(
+CREATE OR REPLACE FUNCTION sp_users_create(
+    p_tipo_identificacion UUID,
+    p_identificacion VARCHAR,
     p_nombre VARCHAR,
-    p_primer_apellido VARCHAR,
-    p_segundo_apellido VARCHAR,
-    p_numero_identificacion VARCHAR,
-    p_id_identificacion INT,
-    p_nombre_usuario VARCHAR,
-    p_correo_electronico VARCHAR,
-    p_contrasena VARCHAR,
-    p_numero_telefono VARCHAR DEFAULT NULL
+    p_apellido VARCHAR,
+    p_correo VARCHAR,
+    p_telefono VARCHAR,
+    p_usuario VARCHAR,
+    p_contrasena_hash VARCHAR,
+    p_rol UUID
 )
+RETURNS UUID
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_persona_id INT;
+    v_id UUID;
 BEGIN
-    BEGIN
-        INSERT INTO persona (
-            nombre,
-            primer_apellido,
-            segundo_apellido,
-            numero_identificacion,
-            id_identificacion,
-            numero_telefono
-        )
-        VALUES (
-            p_nombre,
-            p_primer_apellido,
-            p_segundo_apellido,
-            p_numero_identificacion,
-            p_id_identificacion,
-            p_numero_telefono
-        )
-        RETURNING id_persona INTO v_persona_id;
 
-        INSERT INTO usuario (
-            nombre_usuario,
-            correo_electronico,
-            contrasena,
-            id_persona
-        )
-        VALUES (
-            p_nombre_usuario,
-            lower(p_correo_electronico),
-            crypt(p_contrasena, gen_salt('bf')),
-            v_persona_id
-        );
+    IF EXISTS (SELECT 1 FROM usuario WHERE identificacion = p_identificacion) THEN
+        RAISE EXCEPTION 'Identificación ya registrada';
+    END IF;
+    IF EXISTS (SELECT 1 FROM usuario WHERE correo = p_correo) THEN
+        RAISE EXCEPTION 'Correo ya registrado';
+    END IF;
+    IF EXISTS (SELECT 1 FROM usuario WHERE usuario = p_usuario) THEN
+        RAISE EXCEPTION 'Nombre de usuario ya registrado';
+    END IF;
 
-        RAISE NOTICE 'Usuario creado exitosamente (persona id = %, usuario id generado automáticamente)', v_persona_id;
+    INSERT INTO usuario (
+        tipo_identificacion,
+        identificacion,
+        nombre,
+        apellido,
+        correo,
+        telefono,
+        usuario,
+        contrasena_hash,
+        rol
+    )
+    VALUES (
+        p_tipo_identificacion,
+        p_identificacion,
+        p_nombre,
+        p_apellido,
+        p_correo,
+        p_telefono,
+        p_usuario,
+        p_contrasena_hash,
+        p_rol
+    )
+    RETURNING id INTO v_id;
 
-    EXCEPTION
-        WHEN unique_violation THEN
-            RAISE NOTICE 'Error: el número de identificación o el nombre de usuario ya existen.';
-        WHEN others THEN
-            RAISE NOTICE 'Error inesperado al crear el usuario: %', SQLERRM;
-    END;
+    RETURN v_id;
 END;
 $$;
