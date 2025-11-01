@@ -123,10 +123,41 @@ export const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "OTP inválido" });
     }
 
-    res.json({ message: "OTP verificado correctamente" });
+    res.json({ message: "OTP verificado correctamente",
+      id: userId,
+      codigo: otpRecord.codigo_hash
+     });
 
   } catch (err) {
     console.error("Error en verifyOtp:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { userId, otpHash, newPassword } = req.body;
+    if (!userId || !otpHash || !newPassword) {
+      return res.status(400).json({ message: "Faltan datos requeridos" });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    const result = await pool.query(
+        "SELECT sp_otp_consume($1, 'password_reset', $2, $3) AS success",
+        [userId, otpHash, newPasswordHash]
+    );
+
+    const success = result.rows[0].success;
+
+    if (!success) {
+      return res.status(400).json({ message: "No se pudo actualizar la contraseña. OTP inválido o ya consumido." });
+    }
+
+    res.json({ message: "Contraseña actualizada correctamente" });
+
+  } catch (err) {
+    console.error("Error en resetPassword:", err);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
