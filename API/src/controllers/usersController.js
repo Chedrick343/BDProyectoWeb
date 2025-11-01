@@ -30,3 +30,41 @@ export const creatUser = async (req, res) => {
     });
   }
 };
+
+export const getUserByIdentification = async (req, res) => {
+  const { identification } = req.params;
+  const authUser = req.user;
+  console.log(identification, authUser);
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM sp_users_get_by_identification($1);",
+      [identification]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const user = result.rows[0];
+
+    const isAdmin = authUser.rol === "admin" || authUser.rol === "Admin";
+    const isOwner = identification === user.identificacion;
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ message: "Acceso denegado" });
+    }
+    console.log(user);
+    res.status(200).json({
+      id: user.id,
+      nombre: user.nombre,
+      apellido: user.apellido,
+      correo: user.correo,
+      usuario: user.usuario,
+      rol: user.nombre_rol
+    });
+  } catch (error) {
+    console.error("Error al consultar usuario:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};

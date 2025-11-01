@@ -40,7 +40,8 @@ export const login = async (req, res) => {
       message: 'Autenticación correcta.',
       data: {
         token,
-        expiresIn: JWT_EXPIRES_IN
+        expiresIn: JWT_EXPIRES_IN,
+        id: user.user_id
       }
     });
 
