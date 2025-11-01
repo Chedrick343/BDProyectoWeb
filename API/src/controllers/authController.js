@@ -53,3 +53,80 @@ export const login = async (req, res) => {
     });
   }
 };
+
+
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "El email es requerido" });
+
+    const result = await pool.query(
+        "SELECT * FROM sp_users_get_by_email($1)",
+        [email]
+    );
+
+    if (result.rowCount === 0)
+      return res.status(404).json({ message: "Codigo otp generado, si tu correo es correcto llegará a tu email" });
+
+    const userId = result.rows[0].id;
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+
+    const otpHash = await bcrypt.hash(otp, 10);
+
+    await pool.query("SELECT sp_otp_create($1, 'password_reset', 300, $2)", [userId, otpHash]);
+
+
+    res.json({
+      message: "Codigo otp generado, si tu correo es correcto llegará a tu email (Verdadero).",
+      otp,
+      id: userId
+    });
+
+  } catch (err) {
+    console.error("Error en forgotPassword:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+export const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email y OTP son requeridos" });
+    }
+
+    const userResult = await pool.query(
+        "SELECT * FROM sp_users_get_by_email($1)",
+        [email]
+    );
+    
+    if (userResult.rowCount === 0)
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    const userId = userResult.rows[0].id;
+
+    const otpResult = await pool.query(
+        "SELECT * FROM sp_otp_get($1, 'password_reset')",
+        [userId]
+    );
+
+    if (otpResult.rowCount === 0) {
+      return res.status(400).json({ message: "OTP inválido o expirado" });
+    }
+
+    const otpRecord = otpResult.rows[0];
+
+    const isMatch = await bcrypt.compare(otp, otpRecord.codigo_hash);
+    if (!isMatch) {
+      return res.status(400).json({ message: "OTP inválido" });
+    }
+
+    res.json({ message: "OTP verificado correctamente" });
+
+  } catch (err) {
+    console.error("Error en verifyOtp:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
