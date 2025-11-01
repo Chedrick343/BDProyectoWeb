@@ -8,7 +8,7 @@ export const creatUser = async (req, res) => {
     try {
         const {tipo_identificacion,identificacion,nombre,apellido,correo,telefono, usuario, contrasena,rol} = req.body; 
         const contrasena_hash = await bcrypt.hash(contrasena, 10);
-        const sql = 'SELECT * FROM sp_user_create($1, $2, $3, $4, $5, $6, $7, $8, $9)';
+        const sql = 'SELECT * FROM sp_users_create($1, $2, $3, $4, $5, $6, $7, $8, $9)';
         const values = [tipo_identificacion,identificacion,nombre,apellido,correo,telefono, usuario, contrasena_hash,rol];
 
         const { rows } = await pool.query(sql, values);
@@ -66,5 +66,25 @@ export const getUserByIdentification = async (req, res) => {
   } catch (error) {
     console.error("Error al consultar usuario:", error);
     res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const sql = 'SELECT * FROM sp_users_delete($1)';
+    await pool.query(sql, [userId]);
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Usuario eliminado correctamente.'
+    });
+
+  } catch (error) {
+    console.error('Error en deleteUser:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Ocurrió un error al eliminar el usuario.'
+    });
   }
 };

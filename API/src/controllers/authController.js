@@ -33,6 +33,7 @@ export const login = async (req, res) => {
       userId: user.user_id,
       role: user.rol_nombre
     };
+    console.log('Payload para el token JWT:', payload);
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
     return res.status(200).json({
