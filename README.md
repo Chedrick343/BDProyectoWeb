@@ -52,9 +52,6 @@ PGPORT=15431
 API_KEY=apiBanco_damena22*
 JWT_SECRET=asecreta_muy_segura_que_cambies
 JWT_EXPIRES_IN=1h
-
-# Servidor
-PORT=3000
 ```
 
 ---
@@ -70,7 +67,7 @@ PORT=3000
 
 1. **Clonar el repositorio**
    ```bash
-   git clone <url-del-repositorio>
+   git clone https://github.com/Chedrick343/BDProyectoWeb.git
    cd BDProyectoWeb
    ```
 
@@ -80,25 +77,15 @@ PORT=3000
    npm install
    ```
 
-3. **Configurar variables de entorno**
+3. **Ejecutar la aplicación**
    ```bash
-   # Crear archivo .env en la carpeta API/
-   # y agregar las variables listadas arriba
+   node src/server.js
    ```
 
-4. **Ejecutar la aplicación**
-   ```bash
-   # Desarrollo (con nodemon)
-   npm run dev
-
-   # Producción
-   npm start
-   ```
-
-5. **Verificar funcionamiento**
+4. **Verificar funcionamiento**
    ```bash
    # El servidor estará disponible en:
-   http://localhost:3000
+   https://bdproyectoweb-3.onrender.com/
    ```
 
 ---
@@ -173,3 +160,8 @@ Incluye una colección con:
 - Ejemplos de requests/responses  
 - Variables de entorno para testing  
 - Headers preconfigurados  
+
+```bash
+   # El postman está disponible en:
+   https://documenter.getpostman.com/view/48955203/2sB3WpRM5p
+```
