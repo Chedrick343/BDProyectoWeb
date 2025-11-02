@@ -1,7 +1,14 @@
-CREATE OR REPLACE FUNCTION sp_otp_consume(
+DROP FUNCTION IF EXISTS sp_otp_consume(
     p_usuario_id UUID,
     p_proposito VARCHAR,
     p_codigo_hash VARCHAR
+);
+
+CREATE OR REPLACE FUNCTION sp_otp_consume(
+    p_usuario_id UUID,
+    p_proposito VARCHAR,
+    p_codigo_hash VARCHAR,
+    p_nueva_contrasena_hash VARCHAR
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -15,18 +22,23 @@ BEGIN
     WHERE usuario_id = p_usuario_id
       AND proposito = p_proposito
       AND codigo_hash = p_codigo_hash
-      AND (fecha_consumido IS NULL)
+      AND fecha_consumido IS NULL
       AND fecha_expiracion >= NOW()
     LIMIT 1;
 
+    -- Si no se encontró un OTP válido
     IF NOT FOUND THEN
         RETURN FALSE;
     END IF;
+        
 
-    -- Marcar como consumido
-    UPDATE otp
-    SET fecha_consumido = NOW()
-    WHERE id = v_id;
+            UPDATE otp
+            SET fecha_consumido = NOW()
+            WHERE id = v_id;
+
+    UPDATE usuario
+    SET contrasena_hash = p_nueva_contrasena_hash
+    WHERE id = p_usuario_id;
 
     RETURN TRUE;
 END;

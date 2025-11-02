@@ -1,5 +1,7 @@
 import { pool } from '../config/db.js';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { encryptData, decryptData } from '../config/encryption.js';
 
 export const createCard = async (req, res) => {
     try {
@@ -24,9 +26,8 @@ export const createCard = async (req, res) => {
         }
 
         // Encriptar CVV y PIN
-        const cvv_encriptado = await bcrypt.hash(cvv, 10);
-        const pin_encriptado = await bcrypt.hash(pin, 10);
-
+        const cvv_encriptado = encryptData(cvv);
+        const pin_encriptado = encryptData(pin);
         // Llamar al stored procedure
         const sql = 'SELECT * FROM sp_cards_create($1, $2, $3, $4, $5, $6, $7, $8, $9)';
         const values = [
@@ -290,4 +291,113 @@ export const addCardMovement = async (req, res) => {
             message: 'Ocurrió un error al agregar el movimiento'
         });
     }
+};
+
+export const generateOtpTemporalVisualization = async (req, res) => {
+    try {
+    const { userId } = req.user;
+    const otpCode = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otpCode, 10);
+    await pool.query(
+      "SELECT sp_otp_create($1, 'card_details', 60, $2)",
+      [userId, otpHash]
+    );
+
+    return res.status(201).json({
+      status: 'success',
+      message: 'OTP temporal generado correctamente. Válido por 1 minuto. Enviado al correo...',
+      data: {
+        otp: otpCode,
+        expiresIn: 60
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en generateOtpTemporalVisualization:', error);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error al generar el OTP temporal.'
+    });
+  }
+};
+
+export const consumeOtpTemporalVisualization = async (req, res) => {
+    console.log('Params:', req.params);
+    console.log('Body:', req.body);
+    console.log('User:', req.user);
+    try {
+    const { otp } = req.body;
+    const { cardId } = req.params;
+    const { userId } = req.user; 
+    console.log('tarjetaId:', cardId);
+
+    if (!otp) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Debe proporcionar el código OTP.'
+      });
+    }
+
+    const otpResult = await pool.query(
+      "SELECT * FROM sp_otp_get($1, 'card_details')",
+      [userId]
+    );
+
+    if (!otpResult.rows || otpResult.rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'No se encontró un OTP activo para este usuario.'
+      });
+    }
+
+    const otpRecord = otpResult.rows[0];
+    const isMatch = await bcrypt.compare(otp, otpRecord.codigo_hash);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'El código OTP ingresado es incorrecto.'
+      });
+    }
+
+
+    const consumeResult = await pool.query(
+      "SELECT * FROM sp_otp_consume_data($1, $2)",
+      [userId, otp]
+    );
+
+    const success = consumeResult.rows[0]?.success;
+    console.log('otp Consumido');
+
+    if (!success) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'El OTP ya fue consumido o no es válido.'
+      });
+    }
+    const sql = 'SELECT * FROM sp_cards_get_sensible($1, $2)';
+    const values = [userId, cardId];
+    const { rows } = await pool.query(sql, values);
+    const result = rows[0];
+    result.cvv = decryptData(result.cvv_encrypted);
+    result.pin = decryptData(result.pin_encrypted);
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'OTP validado y consumido correctamente.',
+      data:{
+        cvv: result.cvv,
+        pin: result.pin
+    }
+    });
+
+  } catch (error) {
+    console.error('Error en consumeOtpTemporalVisualization:', error);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error al validar o consumir el OTP.'
+    });
+  }
 };
