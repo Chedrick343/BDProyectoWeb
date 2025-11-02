@@ -88,3 +88,63 @@ export const deleteUser = async (req, res) => {
     });
   }
 };
+
+export const updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params; // ID del usuario a modificar
+    const { nombre, apellido, correo, usuario, rol, telefono } = req.body;
+
+    // Verificar que al menos un campo venga con datos
+    if (!nombre && !apellido && !correo && !usuario && !rol && !telefono) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No se proporcionaron campos para actualizar.'
+      });
+    }
+
+    // Llamar al procedimiento almacenado (solo Admin puede acceder aquí)
+    const sql = `
+      SELECT sp_users_update($1, $2, $3, $4, $5, $6, $7) AS updated;
+    `;
+    const values = [
+      userId,
+      nombre,
+      apellido,
+      correo,
+      usuario,
+      rol,
+      telefono
+    ];
+
+    const { rows } = await pool.query(sql, values);
+    const updated = rows[0]?.updated;
+
+    if (!updated) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Usuario no encontrado o no se realizaron cambios.'
+      });
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Usuario actualizado correctamente.'
+    });
+
+  } catch (error) {
+    console.error('Error en updateUser:', error);
+
+    if (error.message.includes('Correo') || error.message.includes('usuario')) {
+      return res.status(400).json({
+        status: 'error',
+        message: error.message
+      });
+    }
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Ocurrió un error al actualizar el usuario.'
+    });
+  }
+};
+
