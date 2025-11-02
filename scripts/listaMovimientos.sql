@@ -32,30 +32,42 @@ BEGIN
     -- Retornar los resultados paginados
     RETURN QUERY
     SELECT 
-        json_agg(
-            json_build_object(
-                'id', mc.id,
-                'fecha', mc.fecha,
-                'tipo', tmc.nombre,
-                'descripcion', mc.descripcion,
-                'moneda', m.iso,
-                'monto', mc.monto
-            )
+        COALESCE(
+            json_agg(
+                json_build_object(
+                    'id', sub.id,
+                    'fecha', sub.fecha,
+                    'tipo', sub.tipo_nombre,
+                    'descripcion', sub.descripcion,
+                    'moneda', sub.moneda_iso,
+                    'monto', sub.monto
+                )
+            ),
+            '[]'::json
         ) AS items,
         v_total AS total,
         p_page AS page,
         p_page_size AS page_size
-    FROM movimiento_cuenta mc
-    INNER JOIN tipo_movimiento_cuenta tmc ON mc.tipo = tmc.id
-    INNER JOIN moneda m ON mc.moneda = m.id
-    WHERE mc.cuenta_id = p_account_id
-    AND (p_from_date IS NULL OR mc.fecha >= p_from_date)
-    AND (p_to_date IS NULL OR mc.fecha <= p_to_date)
-    AND (p_type IS NULL OR mc.tipo = p_type)
-    AND (p_q IS NULL OR mc.descripcion ILIKE '%' || p_q || '%')
-    ORDER BY mc.fecha DESC
-    LIMIT p_page_size
-    OFFSET v_offset;
+    FROM (
+        SELECT 
+            mc.id,
+            mc.fecha,
+            tmc.nombre as tipo_nombre,
+            mc.descripcion,
+            m.iso as moneda_iso,
+            mc.monto
+        FROM movimiento_cuenta mc
+        INNER JOIN tipo_movimiento_cuenta tmc ON mc.tipo = tmc.id
+        INNER JOIN moneda m ON mc.moneda = m.id
+        WHERE mc.cuenta_id = p_account_id
+        AND (p_from_date IS NULL OR mc.fecha >= p_from_date)
+        AND (p_to_date IS NULL OR mc.fecha <= p_to_date)
+        AND (p_type IS NULL OR mc.tipo = p_type)
+        AND (p_q IS NULL OR mc.descripcion ILIKE '%' || p_q || '%')
+        ORDER BY mc.fecha DESC
+        LIMIT p_page_size
+        OFFSET v_offset
+    ) AS sub;
     
 END;
 $$ LANGUAGE plpgsql;
