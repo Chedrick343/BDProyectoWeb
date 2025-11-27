@@ -148,3 +148,43 @@ export const updateUser = async (req, res) => {
   }
 };
 
+export const getUserId = async (req, res) => {
+  try {
+    const { id } = req.body; 
+
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Debe proporcionar un ID de usuario en el body."
+      });
+    }
+
+    const query = `
+      SELECT identificacion 
+      FROM usuario 
+      WHERE id = $1;
+    `;
+
+    const result = await pool.query(query, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "Usuario no encontrado."
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      identificacion: result.rows[0].identificacion
+    });
+
+  } catch (error) {
+    console.error("Error en getUserId:", error);
+
+    return res.status(500).json({
+      status: "error",
+      message: "Error interno del servidor."
+    });
+  }
+};
