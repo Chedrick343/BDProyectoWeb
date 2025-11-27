@@ -14,7 +14,7 @@ export const login = async (req, res) => {
     if (!identifier || !password) {
       return res.status(400).json({ message: 'Faltan credenciales', status: 'error' });
     }
-    const sql = 'SELECT * FROM sp_auth_user_get_by_username_or_email($1)';
+    const sql = 'SELECT * FROM sp_auth_user_get_by_username_or_emailv2($1)';
     const { rows } = await pool.query(sql, [identifier]);
 
 
@@ -23,6 +23,7 @@ export const login = async (req, res) => {
     }
     const user = rows[0];
     const passwordHash = user.contrasena_hash;
+    console.log(user.identificacion);
 
     const match = await bcrypt.compare(password, passwordHash);
     if (!match) {
@@ -40,9 +41,11 @@ export const login = async (req, res) => {
       status: 'success',
       message: 'Autenticación correcta.',
       data: {
+
         token,
         expiresIn: JWT_EXPIRES_IN,
-        id: user.user_id
+        id: user.user_id,
+        identificacion: user.identificacion
       }
     });
 
