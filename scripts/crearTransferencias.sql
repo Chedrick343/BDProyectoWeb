@@ -1,5 +1,4 @@
 
-
 DROP FUNCTION IF EXISTS sp_transfer_create_internal(
     UUID, UUID, DECIMAL, UUID, TEXT, UUID
 );
@@ -36,7 +35,7 @@ BEGIN
     receipt_number := NULL;
     status := 'error';
 
-    -- Verificar si el usuario es administrador
+    -- 1. VERIFICAR SI EL USUARIO ES ADMINISTRADOR
     SELECT EXISTS(
         SELECT 1 FROM usuario u
         INNER JOIN rol r ON u.rol = r.id
@@ -44,7 +43,7 @@ BEGIN
         AND LOWER(r.nombre) = 'administrador'
     ) INTO v_es_admin;
 
-    -- VERIFICACIÓN 1: Cuenta origen existe y obtener datos
+    -- 2. OBTENER DATOS CUENTA ORIGEN CON VALIDACIONES
     SELECT 
         c.saldo, 
         c.moneda,
@@ -62,27 +61,28 @@ BEGIN
     INNER JOIN moneda m ON c.moneda = m.id
     WHERE c.id = p_from_account_id;
 
+    -- 2.1 Validar que la cuenta origen existe
     IF NOT FOUND THEN
         status := 'account_not_found';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 2: Propiedad de la cuenta origen
+    -- 2.2 Validar propiedad de la cuenta origen (¡CRÍTICO!)
     IF NOT v_es_admin AND v_usuario_origen != p_user_id THEN
         status := 'unauthorized';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 3: Estado de cuenta origen (FLEXIBLE)
+    -- 2.3 Validar estado de cuenta origen
     IF LOWER(v_estado_origen) NOT IN ('activa', 'habilitada', 'disponible', 'active') THEN
         status := 'account_inactive';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 4: Cuenta destino existe
+    -- 3. OBTENER DATOS CUENTA DESTINO CON VALIDACIONES
     SELECT 
         c.moneda,
         ec.nombre as estado_nombre,
@@ -96,34 +96,35 @@ BEGIN
     INNER JOIN moneda m ON c.moneda = m.id
     WHERE c.id = p_to_account_id;
 
+    -- 3.1 Validar que la cuenta destino existe
     IF NOT FOUND THEN
         status := 'account_not_found';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 5: Estado de cuenta destino (FLEXIBLE)
+    -- 3.2 Validar estado de cuenta destino
     IF LOWER(v_estado_destino) NOT IN ('activa', 'habilitada', 'disponible', 'active') THEN
         status := 'account_inactive';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 6: No transferir a la misma cuenta
+    -- 4. VALIDAR NO TRANSFERIR A LA MISMA CUENTA
     IF p_from_account_id = p_to_account_id THEN
         status := 'same_account';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 7: Saldo suficiente
+    -- 5. VALIDAR SALDO SUFICIENTE
     IF v_saldo_origen < p_amount THEN
         status := 'insufficient_funds';
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 8: Obtener moneda solicitada
+    -- 6. OBTENER MONEDA SOLICITADA
     SELECT iso INTO v_moneda_iso_requested
     FROM moneda 
     WHERE id = p_currency;
@@ -134,7 +135,7 @@ BEGIN
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 9: Coincidencia de monedas
+    -- 7. VALIDAR COINCIDENCIA DE MONEDAS
     IF v_moneda_iso_origin != v_moneda_iso_requested OR 
        v_moneda_iso_destino != v_moneda_iso_requested THEN
         status := 'currency_mismatch';
@@ -142,7 +143,7 @@ BEGIN
         RETURN;
     END IF;
 
-    -- VERIFICACIÓN 10: Monto positivo
+    -- 8. VALIDAR MONTO POSITIVO
     IF p_amount <= 0 THEN
         status := 'invalid_amount';
         RETURN NEXT;
@@ -152,8 +153,7 @@ BEGIN
     -- TODAS LAS VALIDACIONES PASARON → PROCEDER CON TRANSFERENCIA
     BEGIN
         -- Generar número de recibo
-        v_receipt_number := 'TRF-' || to_char(NOW(), 'YYYYMMDD-HH24MISS') || 
-                           '-' || substr(p_from_account_id::text, 1, 8);
+        v_receipt_number := 'TRF-' || to_char(NOW(), 'YYYYMMDD-HH24MISS');
         
         -- Insertar transferencia
         INSERT INTO transferencia (
@@ -163,7 +163,6 @@ BEGIN
             monto,
             descripcion,
             numero_recibo,
-            estado,
             usuario_id
         ) VALUES (
             p_from_account_id,
@@ -172,7 +171,6 @@ BEGIN
             p_amount,
             p_description,
             v_receipt_number,
-            'completada',
             p_user_id
         ) RETURNING id INTO v_transfer_id;
         
