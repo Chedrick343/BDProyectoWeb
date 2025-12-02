@@ -1,4 +1,3 @@
-
 DROP FUNCTION IF EXISTS sp_transfer_create_internal(
     UUID, UUID, DECIMAL, UUID, TEXT, UUID
 );
@@ -26,130 +25,108 @@ DECLARE
     v_estado_origen VARCHAR;
     v_estado_destino VARCHAR;
     v_es_admin BOOLEAN;
-    v_moneda_iso_origin VARCHAR;
-    v_moneda_iso_destino VARCHAR;
-    v_moneda_iso_requested VARCHAR;
+    v_status TEXT := 'success';
 BEGIN
-    -- Iniciar con valores por defecto
-    transfer_id := NULL;
-    receipt_number := NULL;
-    status := 'error';
-
-    -- 1. VERIFICAR SI EL USUARIO ES ADMINISTRADOR
+    -- 1. VERIFICAR QUE LA CUENTA ORIGEN EXISTA
+    SELECT saldo, moneda, usuario_id 
+    INTO v_saldo_origen, v_moneda_origen, v_usuario_origen
+    FROM cuenta 
+    WHERE id = p_from_account_id;
+    
+    IF NOT FOUND THEN
+        v_status := 'account_not_found';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
+        RETURN;
+    END IF;
+    
+    -- 2. VERIFICAR QUE LA CUENTA DESTINO EXISTA
+    SELECT moneda INTO v_moneda_destino
+    FROM cuenta 
+    WHERE id = p_to_account_id;
+    
+    IF NOT FOUND THEN
+        v_status := 'account_not_found';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
+        RETURN;
+    END IF;
+    
+    -- 3. VALIDAR PROPIEDAD: usuario debe ser dueño o administrador
+    -- 3.1 Verificar si es administrador
     SELECT EXISTS(
         SELECT 1 FROM usuario u
         INNER JOIN rol r ON u.rol = r.id
         WHERE u.id = p_user_id 
         AND LOWER(r.nombre) = 'administrador'
     ) INTO v_es_admin;
-
-    -- 2. OBTENER DATOS CUENTA ORIGEN CON VALIDACIONES
-    SELECT 
-        c.saldo, 
-        c.moneda,
-        c.usuario_id,
-        ec.nombre as estado_nombre,
-        m.iso as moneda_iso
-    INTO 
-        v_saldo_origen, 
-        v_moneda_origen,
-        v_usuario_origen,
-        v_estado_origen,
-        v_moneda_iso_origin
-    FROM cuenta c
-    INNER JOIN estado_cuenta ec ON c.estado = ec.id
-    INNER JOIN moneda m ON c.moneda = m.id
-    WHERE c.id = p_from_account_id;
-
-    -- 2.1 Validar que la cuenta origen existe
-    IF NOT FOUND THEN
-        status := 'account_not_found';
-        RETURN NEXT;
-        RETURN;
-    END IF;
-
-    -- 2.2 Validar propiedad de la cuenta origen (¡CRÍTICO!)
+    
+    -- 3.2 Validar propiedad (si no es admin, debe ser dueño)
     IF NOT v_es_admin AND v_usuario_origen != p_user_id THEN
-        status := 'unauthorized';
-        RETURN NEXT;
+        v_status := 'unauthorized';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 2.3 Validar estado de cuenta origen
-    IF LOWER(v_estado_origen) NOT IN ('activa', 'habilitada', 'disponible', 'active') THEN
-        status := 'account_inactive';
-        RETURN NEXT;
-        RETURN;
-    END IF;
-
-    -- 3. OBTENER DATOS CUENTA DESTINO CON VALIDACIONES
-    SELECT 
-        c.moneda,
-        ec.nombre as estado_nombre,
-        m.iso as moneda_iso
-    INTO 
-        v_moneda_destino,
-        v_estado_destino,
-        v_moneda_iso_destino
+    
+    -- 4. VALIDAR ESTADOS DE LAS CUENTAS
+    -- 4.1 Obtener estado de cuenta origen
+    SELECT ec.nombre INTO v_estado_origen
     FROM cuenta c
     INNER JOIN estado_cuenta ec ON c.estado = ec.id
-    INNER JOIN moneda m ON c.moneda = m.id
+    WHERE c.id = p_from_account_id;
+    
+    -- 4.2 Obtener estado de cuenta destino
+    SELECT ec.nombre INTO v_estado_destino
+    FROM cuenta c
+    INNER JOIN estado_cuenta ec ON c.estado = ec.id
     WHERE c.id = p_to_account_id;
-
-    -- 3.1 Validar que la cuenta destino existe
-    IF NOT FOUND THEN
-        status := 'account_not_found';
-        RETURN NEXT;
+    
+    -- 4.3 Validar que ambas cuentas estén activas
+    IF LOWER(v_estado_origen) NOT IN ('activa', 'habilitada', 'disponible', 'active') THEN
+        v_status := 'account_inactive';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 3.2 Validar estado de cuenta destino
+    
     IF LOWER(v_estado_destino) NOT IN ('activa', 'habilitada', 'disponible', 'active') THEN
-        status := 'account_inactive';
-        RETURN NEXT;
+        v_status := 'account_inactive';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 4. VALIDAR NO TRANSFERIR A LA MISMA CUENTA
+    
+    -- 5. VALIDAR QUE NO SEA LA MISMA CUENTA
     IF p_from_account_id = p_to_account_id THEN
-        status := 'same_account';
-        RETURN NEXT;
+        v_status := 'same_account';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 5. VALIDAR SALDO SUFICIENTE
+    
+    -- 6. VALIDAR SALDO (ya existía)
     IF v_saldo_origen < p_amount THEN
-        status := 'insufficient_funds';
-        RETURN NEXT;
+        v_status := 'insufficient_funds';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 6. OBTENER MONEDA SOLICITADA
-    SELECT iso INTO v_moneda_iso_requested
-    FROM moneda 
-    WHERE id = p_currency;
-
-    IF NOT FOUND THEN
-        status := 'invalid_currency';
-        RETURN NEXT;
+    
+    -- 7. VALIDAR QUE LA MONEDA SOLICITADA EXISTA
+    IF NOT EXISTS (SELECT 1 FROM moneda WHERE id = p_currency) THEN
+        v_status := 'invalid_currency';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 7. VALIDAR COINCIDENCIA DE MONEDAS
-    IF v_moneda_iso_origin != v_moneda_iso_requested OR 
-       v_moneda_iso_destino != v_moneda_iso_requested THEN
-        status := 'currency_mismatch';
-        RETURN NEXT;
+    
+    -- 8. VALIDAR MONEDAS (ya existía)
+    IF v_moneda_origen != p_currency OR v_moneda_destino != p_currency THEN
+        v_status := 'currency_mismatch';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
-    -- 8. VALIDAR MONTO POSITIVO
+    
+    -- 9. VALIDAR MONTO POSITIVO
     IF p_amount <= 0 THEN
-        status := 'invalid_amount';
-        RETURN NEXT;
+        v_status := 'invalid_amount';
+        RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
         RETURN;
     END IF;
-
+    
     -- TODAS LAS VALIDACIONES PASARON → PROCEDER CON TRANSFERENCIA
     BEGIN
         -- Generar número de recibo
@@ -161,17 +138,13 @@ BEGIN
             cuenta_destino,
             moneda,
             monto,
-            descripcion,
-            numero_recibo,
-            usuario_id
+            descripcion
         ) VALUES (
             p_from_account_id,
             p_to_account_id,
             p_currency,
             p_amount,
-            p_description,
-            v_receipt_number,
-            p_user_id
+            p_description
         ) RETURNING id INTO v_transfer_id;
         
         -- Registrar movimiento de débito en cuenta origen
@@ -209,30 +182,19 @@ BEGIN
         );
         
         -- Actualizar saldos
-        UPDATE cuenta 
-        SET saldo = saldo - p_amount, 
-            fecha_actualizacion = NOW()
+        UPDATE cuenta SET saldo = saldo - p_amount, fecha_actualizacion = NOW()
         WHERE id = p_from_account_id;
         
-        UPDATE cuenta 
-        SET saldo = saldo + p_amount, 
-            fecha_actualizacion = NOW()
+        UPDATE cuenta SET saldo = saldo + p_amount, fecha_actualizacion = NOW()
         WHERE id = p_to_account_id;
         
-        -- Retornar éxito
-        transfer_id := v_transfer_id;
-        receipt_number := v_receipt_number;
-        status := 'success';
-        
-        RETURN NEXT;
-        RETURN;
+        -- Retornar resultados exitosos
+        RETURN QUERY SELECT v_transfer_id, v_receipt_number, v_status;
         
     EXCEPTION
         WHEN OTHERS THEN
-            -- En caso de error en la transacción
-            status := 'error';
-            RETURN NEXT;
-            RETURN;
+            v_status := 'error';
+            RETURN QUERY SELECT NULL::UUID, NULL::TEXT, v_status;
     END;
     
 END;

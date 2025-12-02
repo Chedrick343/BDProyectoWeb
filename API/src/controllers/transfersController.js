@@ -4,14 +4,7 @@ export const createInternalTransfer = async (req, res) => {
     let client;
     
     try {
-        const { 
-            from_account_id, 
-            to_account_id, 
-            amount, 
-            currency, 
-            description
-        } = req.body;
-
+        const { from_account_id, to_account_id, amount, currency, description } = req.body;
         const user_id = req.user.id;
 
         // Validaciones básicas
@@ -33,26 +26,13 @@ export const createInternalTransfer = async (req, res) => {
             });
         }
 
-        // ========== EJECUTAR TRANSFERENCIA ==========
         client = await pool.connect();
         
         try {
             await client.query('BEGIN');
 
-            const sql = `
-                SELECT * FROM sp_transfer_create_internal(
-                    $1, $2, $3, $4, $5, $6
-                )
-            `;
-            
-            const values = [
-                from_account_id, 
-                to_account_id, 
-                amount, 
-                currency, 
-                description || '', 
-                user_id
-            ];
+            const sql = `SELECT * FROM sp_transfer_create_internal($1, $2, $3, $4, $5, $6)`;
+            const values = [from_account_id, to_account_id, amount, currency, description || '', user_id];
 
             const result = await client.query(sql, values);
             const transferResult = result.rows[0];
@@ -67,10 +47,10 @@ export const createInternalTransfer = async (req, res) => {
                 });
             }
 
-            // ========== MANEJAR RESULTADO ==========
             if (transferResult.status !== 'success') {
                 await client.query('ROLLBACK');
                 
+                // Mapear todos los posibles errores
                 const errorMapping = {
                     'unauthorized': {
                         code: 403,
@@ -133,7 +113,6 @@ export const createInternalTransfer = async (req, res) => {
                 });
             }
 
-            // ========== TRANSFERENCIA EXITOSA ==========
             await client.query('COMMIT');
 
             return res.status(201).json({
