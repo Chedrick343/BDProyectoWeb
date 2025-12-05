@@ -3,34 +3,37 @@ import { pool } from '../config/db.js';
 export const getDataIBAN = async (req, res) => {
   try {
     const { iban } = req.body;
+    const esCuentaValida = evaluarIban(iban);
+    
 
-    if (!iban) {
+    if (!esCuentaValida) {
       return res.status(400).json({
-        status: 'error',
-        message: 'Debe proporcionar un IBAN en el cuerpo de la solicitud.'
+        error: 'INVALID_ACCOUNT_FORMAT',
+        message: 'El formato iban no es válido.'
       });
     }
 
-    // Llamamos al procedimiento almacenado
     const sql = 'SELECT * FROM sp_bank_validate_account($1)';
     const values = [iban.trim()];
     const { rows } = await pool.query(sql, values);
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'No se encontró una cuenta con el IBAN especificado.'
+      return res.status(200).json({
+        exists: false,
+        info: null
       });
     }
 
     const titular = rows[0];
 
     return res.status(200).json({
-      status: 'success',
-      message: 'Datos del titular obtenidos correctamente.',
-      data: {
-        nombre: titular.nombre,
-        apellido: titular.apellido
+      exists: true,
+      info: {
+        name: titular.nombre + ' ' + titular.apellido,
+        identification: titular.identificacion,
+        currency: titulartular.currency,
+        debit: true,
+        credit: true
       }
     });
 
@@ -38,9 +41,9 @@ export const getDataIBAN = async (req, res) => {
     console.error('Error en getDataIBAN:', error);
 
     if (error.message.includes('no existe')) {
-      return res.status(404).json({
-        status: 'error',
-        message: error.message
+      return res.status(200).json({
+        exists: false,
+        info: null
       });
     }
 
@@ -50,3 +53,9 @@ export const getDataIBAN = async (req, res) => {
     });
   }
 };
+
+function evaluarIban(iban) {
+
+  const ibanRegex = /^CR01B08\d{12}$/;
+  return ibanRegex.test(iban);
+}
