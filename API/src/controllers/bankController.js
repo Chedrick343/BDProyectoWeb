@@ -41,9 +41,9 @@ export const getDataIBAN = async (req, res) => {
     console.error('Error en getDataIBAN:', error);
 
     if (error.message.includes('no existe')) {
-      return res.status(404).json({
-        status: 'error',
-        message: error.message
+      return res.status(200).json({
+        exists: false,
+        info: null
       });
     }
 
