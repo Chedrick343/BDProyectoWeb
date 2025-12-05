@@ -218,18 +218,32 @@ const validateTransferInput = (input) => {
 };
 
 
-
-
 export async function interbankTransfer(req, res) {
 
     const { from, to, amount, currency, description } = req.body;
 
+    // Validaciones
     if (!from || !to || amount <= 0) {
         return res.status(400).json({ error: "Datos inválidos" });
     }
-    console.log("Socket conectado:", socket.connected);
+
+    // Verificar que el socket está conectado
+    if (!socket.connected) {
+        console.error("❌ Socket no conectado al Banco Central");
+        return res.status(503).json({
+            error: "No hay conexión con el Banco Central",
+            code: "BANK_UNREACHABLE"
+        });
+    }
+
     const id = uuid();
-        console.log("➡️ Enviando transfer.intent…", {
+    
+    // Crear una promesa que se resuelve cuando el banco responda
+    const transferPromise = new Promise((resolve, reject) => {
+        pendingTransfers[id] = { resolve, reject };
+    });
+
+    console.log("➡️ Enviando transfer.intent…", {
         type: "transfer.intent",
         data: { id, from, to, amount, currency }
     });
@@ -239,8 +253,36 @@ export async function interbankTransfer(req, res) {
         data: { id, from, to, amount, currency }
     });
 
-
     console.log("📤 transfer.intent enviado:", id);
+    console.log("👂 Esperando respuesta del Banco Central...");
 
-    return res.json();
+    try {
+        // Esperar la respuesta del banco con timeout de 30 segundos
+        const response = await Promise.race([
+            transferPromise,
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("TIMEOUT: Respuesta del banco tardó demasiado")), 30000)
+            )
+        ]);
+
+        // Limpiar promesa después de resolver
+        delete pendingTransfers[id];
+
+        return res.json({
+            success: response.status === "success",
+            id,
+            status: response.status,
+            data: response
+        });
+
+    } catch (error) {
+        // Limpiar promesa en caso de error
+        delete pendingTransfers[id];
+
+        console.error("❌ Error en transfer:", error.message);
+        return res.status(500).json({
+            error: error.message,
+            id
+        });
+    }
 }

@@ -1,14 +1,14 @@
 import { pool } from '../config/db.js';
 import { socket } from "../ws/websocket.js";
 
-socket.onAny((event, ...args) => {
-    console.log("📡 EVENTO CAPTURADO:", event, args);
-});
+// Variable para almacenar promesas pendientes
+const pendingTransfers = {};
 
 socket.on("event", async (msg) => {
     const { type, data } = msg;
 
-    console.log("📥 Evento recibido:", type, data);
+    console.log("📥 Evento recibido:", type, "│ ID:", data?.id || "N/A");
+    console.log("   Datos:", JSON.stringify(data, null, 2));
 
     switch (type) {
 
