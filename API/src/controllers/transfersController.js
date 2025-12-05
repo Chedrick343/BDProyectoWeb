@@ -1,4 +1,8 @@
 import { pool } from '../config/db.js';
+import { socket } from "../ws/websocket.js";
+import { v4 as uuid } from "uuid";
+
+const pendingTransfers = {}; // Guardar promesas
 
 export const createInternalTransfer = async (req, res) => {
     let client;
@@ -212,3 +216,25 @@ const validateTransferInput = (input) => {
     
     return errors;
 };
+
+
+
+
+export async function interbankTransfer(req, res) {
+
+    const { from, to, amount, currency, description } = req.body;
+
+    if (!from || !to || amount <= 0) {
+        return res.status(400).json({ error: "Datos inválidos" });
+    }
+
+    const id = uuid();
+    socket.emit("event", {
+        type: "transfer.intent",
+        data: { id, from, to, amount, currency  }
+    });
+
+    console.log("📤 transfer.intent enviado:", id);
+
+    return res.json();
+}

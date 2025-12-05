@@ -31,7 +31,7 @@ export const getDataIBAN = async (req, res) => {
       info: {
         name: titular.nombre + ' ' + titular.apellido,
         identification: titular.identificacion,
-        currency: titulartular.currency,
+        currency: titular.currency,
         debit: true,
         credit: true
       }
