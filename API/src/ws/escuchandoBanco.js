@@ -1,6 +1,10 @@
 import { pool } from '../config/db.js';
 import { socket } from "../ws/websocket.js";
 
+socket.onAny((event, ...args) => {
+    console.log("📡 EVENTO CAPTURADO:", event, args);
+});
+
 socket.on("event", async (msg) => {
     const { type, data } = msg;
 
@@ -8,9 +12,6 @@ socket.on("event", async (msg) => {
 
     switch (type) {
 
-        // --------------------
-        // BANCO ORIGEN
-        // --------------------
         case "transfer.reserve":
             const okReserve = await validarValoresCuenta(data.id);
             socket.emit("event", {
@@ -39,8 +40,10 @@ socket.on("event", async (msg) => {
         // BANCO DESTINO
         // --------------------
         case "transfer.init":
+            console.log("Iniciando transferencia en banco destino:", data);
             await registrarInit(data);
             break;
+
 
         case "transfer.credit":
             const okCredit = await acreditarTemporalmente(data);

@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 export const socket = io("http://137.184.36.3:6000", {
     transports: ["websocket"],
     auth: {
-        bankId: "B08",           
+        bankId: "B06",           
         bankName: "Damena",
         token: "BANK-CENTRAL-IC8057-2025"
     }

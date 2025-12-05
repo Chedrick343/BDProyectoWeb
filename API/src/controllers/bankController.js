@@ -56,6 +56,6 @@ export const getDataIBAN = async (req, res) => {
 
 function evaluarIban(iban) {
 
-  const ibanRegex = /^CR01B08\d{12}$/;
+  const ibanRegex = /^CR01B06\d{12}$/;
   return ibanRegex.test(iban);
 }

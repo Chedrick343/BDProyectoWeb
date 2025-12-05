@@ -227,12 +227,18 @@ export async function interbankTransfer(req, res) {
     if (!from || !to || amount <= 0) {
         return res.status(400).json({ error: "Datos inválidos" });
     }
-
+    console.log("Socket conectado:", socket.connected);
     const id = uuid();
+        console.log("➡️ Enviando transfer.intent…", {
+        type: "transfer.intent",
+        data: { id, from, to, amount, currency }
+    });
+
     socket.emit("event", {
         type: "transfer.intent",
-        data: { id, from, to, amount, currency  }
+        data: { id, from, to, amount, currency }
     });
+
 
     console.log("📤 transfer.intent enviado:", id);
 
