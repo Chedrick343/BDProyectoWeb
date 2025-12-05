@@ -70,7 +70,7 @@ export const forgotPassword = async (req, res) => {
         "SELECT * FROM sp_users_get_by_email($1)",
         [email]
     );
-
+    console.log("resultado: ", result);
     if (result.rowCount === 0)
       return res.status(404).json({ message: "Codigo otp generado, si tu correo es correcto llegará a tu email" });
 
@@ -86,7 +86,7 @@ export const forgotPassword = async (req, res) => {
 
     res.json({
       message: "Codigo otp generado, si tu correo es correcto llegará a tu email (Verdadero).",
-      otp,
+      otp: otp,
       id: userId
     });
 
@@ -122,8 +122,10 @@ export const verifyOtp = async (req, res) => {
     }
 
     const otpRecord = otpResult.rows[0];
-
+    console.log("otpRecord:", otpRecord);
+    console.log("otp proporcionado:", otp);
     const isMatch = await bcrypt.compare(otp, otpRecord.codigo_hash);
+    console.log("¿Coincidencia de OTP?:", isMatch);
     if (!isMatch) {
       return res.status(400).json({ message: "OTP inválido" });
     }
